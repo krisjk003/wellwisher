@@ -124,7 +124,8 @@ export function normalizeRecord(value: unknown, fallbackDate: string, projectTyp
   const projectSource = isObject(source.projects) ? source.projects : {}, mealSource = isObject(source.meals) ? source.meals : {};
   const refs = isObject(source.reflections) ? source.reflections : {}, base = blankRecord(validDate(source.date, fallbackDate), projectTypes);
   const study = Object.fromEntries(studyKeys.map(k => [k, normalizeStudy(studySource[k])])) as Record<StudyKey, StudyEntry>;
-  const projectNames = [...new Set([...baseProjectKeys, ...projectTypes, ...Object.keys(projectSource)])];
+  const projectNames = [...baseProjectKeys, ...projectTypes, ...Object.keys(projectSource)]
+    .filter((name, index, names) => names.indexOf(name) === index);
   const projects = Object.fromEntries(projectNames.map(k => [k, normalizeProject(projectSource[k])])) as Record<string, ProjectEntry>;
   const oldWorkout = integer(source.workout, 0, 0, 1440);
   const workoutSource = isObject(source.workout) ? source.workout : {};
@@ -196,7 +197,16 @@ export function evidenceCount(record: DailyRecord) {
   return sumStudy(record) + sumProjects(record) + studyKeys.filter(key => record.study[key].state === "recorded").length + Object.values(record.projects).filter(entry => entry.state === "recorded").length + (record.workout.state === "recorded" ? 1 : 0) + (record.screen.state === "recorded" ? 1 : 0) + healthyMeals(record) + oilyMeals(record) + (record.mood == null ? 0 : 1) + Object.values(record.reflections).filter(Boolean).length;
 }
 export function streak(dates: string[], zone: string) { const set = new Set(dates); let cursor = dayNumber(todayInZone(zone)); if (!set.has(dateFromDay(cursor))) cursor--; let count = 0; while (set.has(dateFromDay(cursor))) { count++; cursor--; } return count; }
-export function bestStreak(dates: string[]) { const sorted = [...new Set(dates)].sort(); let best = 0, run = 0, previous = ""; for (const date of sorted) { run = previous && dayNumber(date) - dayNumber(previous) === 1 ? run + 1 : 1; best = Math.max(best, run); previous = date; } return best; }
+export function bestStreak(dates: string[]) {
+  const sorted = dates.filter((date, index, values) => values.indexOf(date) === index).sort();
+  let best = 0, run = 0, previous = "";
+  for (const date of sorted) {
+    run = previous && dayNumber(date) - dayNumber(previous) === 1 ? run + 1 : 1;
+    best = Math.max(best, run);
+    previous = date;
+  }
+  return best;
+}
 
 export type ScoreBreakdown = { total: number; items: { label: string; value: number; weight: number; explanation: string; evidence: boolean }[]; bonuses: string[]; penalties: string[] };
 export function scoreBreakdown(record: DailyRecord, store: Store): ScoreBreakdown {
